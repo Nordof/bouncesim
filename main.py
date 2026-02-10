@@ -6,7 +6,9 @@ import ctypes
 pg.init()
 
 #Constantes
+intro_text_size=50
 font = pg.font.SysFont('Arial', 30)
+intro_font = pg.font.SysFont('Arial', intro_text_size)
 user32 = ctypes.windll.user32
 screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 width = screensize[0]
@@ -114,10 +116,7 @@ def resolve_collision(ball1, ball2):
     ball2.xspeed += impulse_x / m2
     ball2.yspeed += impulse_y / m2
 
-    # ==============================
     # Correction d’overlap (position)
-    # ==============================
-
     penetration = ball1.radius + ball2.radius - dist
     if penetration > 0:
         percent = 1.0        # 100% de correction
@@ -180,10 +179,72 @@ def check_interact_color(balls):
             else:
                 balls[i].interact_cooldown-=1
 
+def display_intro(surface):
+    clock = pg.time.Clock()
+    surface_text = pg.Surface(win_size, pg.SRCALPHA)
+
+    # --- Préparation ---
+    surface.fill(FOND_COLOR)
+    surface_text.fill(FOND_COLOR)
+    surface_text.set_alpha(255)
+
+    intro_text = [
+        intro_font.render("Control Key", True, (255, 255, 255)),
+        intro_font.render("New Ball : Space", True, (255, 255, 255)),
+        intro_font.render("Speed up random ball : S", True, (255, 255, 255)),
+        intro_font.render("Erase last ball : K", True, (255, 255, 255)),
+        intro_font.render("Pause : P", True, (255, 255, 255)),
+        intro_font.render("Quit : Escape", True, (255, 255, 255))
+    ]
+
+    for i, t in enumerate(intro_text):
+        surface_text.blit(t,(width // 2 - t.get_rect().centerx, height // 2 - intro_text_size * (len(intro_text) // 2)+ i * (intro_text_size + 5)))
+
+    press_continue = intro_font.render("Press any key to continue", True, (255, 255, 255))
+
+    # --- Affichage initial ---
+    surface.blit(surface_text, (0, 0))
+    pg.display.flip()
+    pg.time.wait(1000)
+
+    # --- Affiche "press any key" ---
+    surface_text.blit(press_continue,(width // 2 - press_continue.get_rect().centerx, height - intro_text_size * 2))
+
+    surface.fill(FOND_COLOR)
+    surface.blit(surface_text, (0, 0))
+    pg.display.flip()
+
+    # --- Attente touche utilisateur ---
+    waiting = True
+    while waiting:
+        clock.tick(60)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return
+            if event.type == pg.KEYDOWN:
+                waiting = False
+
+    # --- Fade-out ---
+    alpha = 255
+    while alpha > 0:
+        clock.tick(60)
+        alpha -= 4
+        surface_text.set_alpha(alpha)
+
+        surface.fill(FOND_COLOR)
+        surface.blit(surface_text, (0, 0))
+        pg.display.flip()
+
+    return
+        
+
 def main():
     surface = pg.display.set_mode(win_size)
     balls=[]
     clock=pg.time.Clock()
+    pause=False
+    #Introduction
+    display_intro(surface)
     while True:
         dt = clock.tick(60) / 1000.0 
         surface.fill(FOND_COLOR)
@@ -191,6 +252,13 @@ def main():
             if event.type == pg.QUIT:
                 loop = False
             if event.type == pg.KEYDOWN:
+                if event.key == pg.K_p:
+                    pause=True if pause==False else False
+                elif event.key == pg.K_ESCAPE:
+                    pg.quit()
+                    return
+                if pause: 
+                    continue   
                 if event.key == pg.K_SPACE:
                     balls.append(newball(balls))
                 elif event.key == pg.K_k:
@@ -198,9 +266,8 @@ def main():
                         balls.pop()
                 elif event.key == pg.K_s:
                     speedup_balls(balls)
-                elif event.key == pg.K_ESCAPE:
-                    pg.quit()
-                    return
+        if pause:
+            continue
         step_update(surface,balls,dt)
         pg.display.flip()
         clock.tick(100)
